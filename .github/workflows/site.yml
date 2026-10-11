@@ -1,0 +1,96 @@
+# The SINGLE GitHub Pages deployer for this repo. GitHub Pages allows one
+# deployment per repo, and deploy-pages replaces the whole site — so every
+# app that wants to be on Pages must be assembled into `site/` here and
+# published in one deploy. Currently:
+#   /                    → MkDocs Material wiki
+#   /console/            → hosted DuckDB S3 console
+#   /trends/             → daily public trends dashboard
+# Do NOT add a second workflow that calls deploy-pages — it silently
+# overwrites this one. That exact bug once put a second app at the site
+# root and clobbered everything else.
+#
+# Specs: job-scout/openspec/changes/job-scout-wiki/design.md (D5),
+#        job-scout/openspec/changes/wiki-live-pages/design.md
+#
+# The 11:45 UTC cron refreshes /trends/ daily, 45 min after the trends
+# data workflow (11:00) commits the new parquet. A push-based chain is
+# impossible: GITHUB_TOKEN bot commits never trigger on:push workflows.
+name: site (unified pages deploy)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "job-scout/docs/**"
+      - "job-pilot/docs/**"
+      - "job-scout/mkdocs.yml"
+      - "job-pilot/mkdocs.yml"
+      - "job-matcher/mkdocs.yml"
+      - "job-matcher/docs/**"
+      - "docs/**"
+      - "job-scout/templates/trends_dashboard.html.j2"
+      - "job-scout/tools/build_trends_report.py"
+      - "utils/duckdb-s3-console.html"
+      - "mkdocs.yml"
+      - ".github/workflows/site.yml"
+  schedule:
+    - cron: "45 11 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: site
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build site (strict — broken links fail)
+        # mkdocs pinned <2: the 2.0 rewrite drops the plugin system
+        # mkdocs-material 9.x depends on.
+        run: |
+          pip install --quiet "mkdocs-material==9.*" "mkdocs<2" \
+            mkdocs-monorepo-plugin
+          mkdocs build --strict
+
+      - name: Build live pages (/console/ + daily /trends/)
+        # Both are CI artifacts only — never committed (wiki-live-pages D1).
+        # /trends/ is the PUBLIC build: --jd none (no JD text, copyright
+        # boundary D3) and --no-targets (no role keywords; visitors can
+        # pass ?roles=a,b,c). Dated copy so the page stamp shows today.
+        run: |
+          pip install --quiet duckdb pyyaml jinja2 certifi
+          mkdir -p site/console site/trends
+          cp utils/duckdb-s3-console.html site/console/index.html
+          stamped="/tmp/ats_raw_trends_$(date -u +%Y%m%d).parquet"
+          cp job-scout/data/ats_raw_trends.parquet "$stamped"
+          python job-scout/tools/build_trends_report.py \
+            --input "$stamped" --out site/trends/index.html \
+            --jd none --no-targets
+          grep -q 'let KEYWORDS = \[\];' site/trends/index.html
+          ls -lh site/trends/ site/console/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

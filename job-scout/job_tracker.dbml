@@ -1,0 +1,161 @@
+// job-scout data model v2 — paste into https://dbdiagram.io to render the ER diagram
+// Evolved from v1: + conference, sponsorship, contact, crawl_log;
+// + visa_sponsorship, pipeline_status, classification, domain_score
+
+Table company {
+  company_id       integer [pk]
+  name             varchar [not null, unique]
+  careers_url      varchar
+  ats_platform     varchar  // ashby | greenhouse | lever | workday | phenom
+  industry         varchar
+  company_stage    varchar  // public | series_a..d_plus | bootstrapped
+  classification   varchar  // established | growth_startup | frontier_ai | boutique_si
+  pipeline_status  varchar  // not_started | jobs_found | alert_target | excluded_visa
+  latest_round     varchar
+  latest_round_usd bigint
+  total_raised_usd bigint
+  hq_location      varchar
+  notes            varchar
+}
+
+Table job_posting {
+  job_id           integer [pk]
+  company_id       integer [ref: > company.company_id, not null]
+  title            varchar [not null]
+  team             varchar
+  level            varchar
+  role_family      varchar  // eng_manager | architect | governance_lead | genai_platform | privacy_eng
+  location         varchar
+  work_mode        varchar  // remote | hybrid | in_office
+  req_id           varchar  // the ID to hand a referrer
+  req_id_type      varchar  // ashby_uuid | workday_r | greenhouse_id | phenom_hash | friendly
+  apply_url        varchar
+  source_url       varchar
+  posted_date      date
+  posted_recency   varchar
+  app_deadline     date
+  status           varchar [default: 'open'] // open|closed|applied|interviewing|rejected|offer
+  visa_sponsorship varchar [default: 'verify'] // yes | no | verify — 'no' zeroes score
+  first_seen       date
+  last_verified    date
+}
+
+Table compensation {
+  job_id     integer [pk, ref: - job_posting.job_id]
+  currency   varchar [default: 'USD']
+  base_min   integer
+  base_max   integer
+  ote_min    integer
+  ote_max    integer
+  equity     boolean
+  bonus      boolean
+  comp_notes varchar
+}
+
+Table fit_assessment {
+  job_id          integer [pk, ref: - job_posting.job_id]
+  priority_rank   integer
+  meets_base_bar  boolean
+  meets_ote_bar   boolean
+  domain_fit      varchar
+  domain_score    double   // 0-1, feeds match_score
+  location_factor double   // 1.0 preferred/remote, 0.7 out-of-state
+  hls_relevant    boolean
+  location_fit    boolean
+}
+
+// External analyzer results (openspec/changes/api-match-report).
+// Candidate-specific, like fit_assessment — but a different scoring
+// model (agent-job-matcher's deterministic 100-point rubric), so the
+// two never share a table. Upserted on re-analysis; jd_sha256 drives
+// the never-re-pay-an-unchanged-job selection in tools/match_sweep.py.
+Table api_match_result {
+  job_id                 integer [pk, ref: - job_posting.job_id]
+  total_score            integer  // 0-100
+  required_skills_score  integer  // 0-60 (60 when preferred budget reallocates)
+  preferred_skills_score integer  // 0-20
+  experience_score       integer  // 0-20
+  domain_score           integer  // 0-20
+  match_status           varchar  // strong_match|good_match|moderate_match|weak_match|no_match
+  run_id                 varchar  // API run id, for traceability
+  jd_sha256              varchar  // hash of harvested JD text (header+body)
+  first_analyzed         date     // preserved across upserts — drives NEW badge
+  last_analyzed          date
+  report_json_path       varchar  // persisted JobReport JSON on disk
+}
+
+Table conference {
+  conference_id integer [pk]
+  name          varchar [not null]
+  organizer     varchar
+  start_date    date
+  end_date      date
+  location      varchar
+  url           varchar
+}
+
+Table sponsorship {
+  conference_id   integer [ref: > conference.conference_id]
+  company_id      integer [ref: > company.company_id]
+  tier            varchar  // legend | advocate | featured | partner
+  verified_source varchar
+  indexes { (conference_id, company_id) [pk] }
+}
+
+Table contact {
+  contact_id   integer [pk]
+  company_id   integer [ref: > company.company_id]
+  name         varchar
+  role         varchar
+  relationship varchar  // ex_colleague | linkedin_1st | linkedin_2nd | community | cold
+  linkedin_url varchar
+  email        varchar  // user-supplied only, never scraped
+  phone        varchar  // user-supplied only, never scraped
+  source       varchar
+  notes        varchar
+}
+
+Table referral {
+  referral_id      integer [pk]
+  job_id           integer [ref: > job_posting.job_id]
+  contact_id       integer [ref: > contact.contact_id]
+  referrer_name    varchar
+  referrer_contact varchar
+  relationship     varchar
+  status           varchar [default: 'identified'] // identified | requested | submitted | declined
+  date_requested   date
+  notes            varchar
+}
+
+Table crawl_log {
+  query_hash  varchar [pk]  // sha256(lower(query))[:16]
+  company     varchar
+  query       text
+  crawled_at  timestamp     // TTL window vs recrawl_ttl_days
+  result_note varchar
+}
+
+Table ats_posting_raw {
+  // Unfiltered landing table: full board state of every configured company
+  // (tools/raw_load.py). Snapshot per company: a successful fetch replaces
+  // that company's rows; failed fetches keep previous rows. The matcher
+  // NEVER reads this table — rows reach the paid /analyze API only after
+  // promotion into job_posting (raw_load.py --promote, dedup company+req_id).
+  company_name    varchar   // config key in search.ats_org_slugs_by_company
+  ats_platform    varchar   // ashby | greenhouse | lever | workday
+  req_id          varchar
+  req_id_type     varchar
+  title           varchar
+  department      varchar   // ashby/greenhouse/lever only
+  team            varchar   // ashby/lever only
+  employment_type varchar   // FullTime | Contract | ... (feed-dependent)
+  location        varchar
+  work_mode       varchar   // 'remote' when the feed flags it
+  comp_summary    varchar   // ashby compensationTierSummary text
+  posted_date     date      // null for undated feeds (lever, workday, ashby-graphql)
+  apply_url       varchar
+  fetched_at      timestamp // load time of this snapshot
+  jd_text         varchar   // full JD as plain text (same html_to_text output the
+                            // sweep hashes, so harvest reads raw-first, no re-fetch)
+  jd_sha256       varchar   // sha256(jd_text) for raw-level change detection
+}

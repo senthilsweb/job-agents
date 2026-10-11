@@ -1,0 +1,76 @@
+# Daily hiring-trends snapshot for job-scout.
+# Spec: job-scout/openspec/changes/trends-dashboard/specs/data-publication/spec.md
+#
+# Fetches every configured ATS board (public JSON APIs, no scraping, no
+# secrets), exports the facts-only trends parquet, and overwrites the
+# single canonical job-scout/data/ats_raw_trends.parquet. Each
+# publish gets a lightweight tag trends/YYYYMMDD, so any day's snapshot
+# stays fetchable via the tag ref (container-and-publishing D6).
+# JD text NEVER lands in data/ (copyright boundary — design D3).
+name: job-scout daily trends
+
+on:
+  schedule:
+    - cron: "0 11 * * *"   # 11:00 UTC ≈ 07:00 US Eastern
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: job-scout-trends
+  cancel-in-progress: false
+
+jobs:
+  trends:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: job-scout
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install --quiet duckdb pyyaml certifi jinja2
+
+      - name: Load all boards (fresh DuckDB, ats_posting_raw only)
+        run: python tools/raw_load.py
+
+      - name: Export trends parquet
+        run: python tools/raw_load.py --export
+
+      - name: Publish to data/ (single canonical file)
+        run: |
+          mkdir -p data
+          cp "exports/ats_raw_trends_$(date -u +%Y%m%d).parquet" data/ats_raw_trends.parquet
+          ls -lh data/
+
+      - name: Commit + tag trends/YYYYMMDD
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add job-scout/data
+          if git diff --cached --quiet; then
+            echo "no data changes today"
+          else
+            git commit -m "data(job-scout): daily trends parquet $(date -u +%F)"
+            git push
+          fi
+          # Tag HEAD regardless of whether data changed — the tag means
+          # "this is the snapshot as of this date". Skip if it exists
+          # (manual re-dispatch on the same day). Must check the REMOTE:
+          # checkout does not fetch tags, so a local rev-parse misses a
+          # tag pushed by an earlier run and the push gets rejected
+          # (seen live 2026-07-20).
+          tag="trends/$(date -u +%Y%m%d)"
+          if git ls-remote --exit-code --tags origin "$tag" >/dev/null; then
+            echo "tag $tag already exists on origin — skipping"
+          else
+            git tag "$tag"
+            git push origin "$tag"
+          fi

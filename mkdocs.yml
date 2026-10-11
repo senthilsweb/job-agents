@@ -1,0 +1,71 @@
+# Umbrella wiki for the job-agents repo, published to GitHub Pages by
+# .github/workflows/site.yml at https://www.senthilsweb.com/job-agents/
+# (project pages resolve under the user site's custom domain).
+#
+# Each project with a docs/ folder is merged in via the mkdocs-monorepo
+# plugin (one !include per project; the child's site_name is its URL
+# namespace): /job-scout/, /job-matcher/, /job-pilot/.
+site_name: job-agents
+site_url: https://www.senthilsweb.com/job-agents/
+repo_url: https://github.com/senthilsweb/job-agents
+repo_name: senthilsweb/job-agents
+edit_uri: edit/main/
+
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.footer
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue grey
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue grey
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Architecture: ARCHITECTURE.md
+  - job-scout: '!include ./job-scout/mkdocs.yml'
+  - job-matcher: '!include ./job-matcher/mkdocs.yml'
+  - job-pilot: '!include ./job-pilot/mkdocs.yml'
+
+plugins:
+  - search
+  - monorepo
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - footnotes
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+extra_javascript:
+  - https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js
+  # lives in job-scout/docs/, so it lands under /job-scout/
+  - job-scout/javascripts/tablesort.js

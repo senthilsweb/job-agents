@@ -1,0 +1,82 @@
+name: OpenAPI artifact
+
+# Separate from job-matcher-release.yml by design (owner direction): releases are cut
+# by semantic-release; this workflow attaches the API contract to them.
+#
+# Trigger note: a release created with the workflow's own GITHUB_TOKEN does
+# NOT emit `release: published` to other workflows (GitHub recursion
+# prevention), so the primary trigger is workflow_run on the Release
+# workflow; `release` stays for manually created releases, and dispatch
+# backfills any tag.
+
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  openapi:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve target release tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+          else
+            TAG=$(gh release view --json tagName --jq .tagName 2>/dev/null || true)
+          fi
+          if [ -z "$TAG" ]; then
+            echo "No release exists yet — nothing to attach."
+            echo "tag=" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+            git checkout "$TAG"
+          fi
+
+      - name: Setup Python
+        if: steps.tag.outputs.tag != ''
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install backend + tooling
+        if: steps.tag.outputs.tag != ''
+        run: pip install -e ./backend pyyaml openapi-spec-validator
+
+      - name: Export OpenAPI spec
+        if: steps.tag.outputs.tag != ''
+        id: export
+        run: |
+          python scripts/export-openapi.py dist
+          if [ -f dist/openapi.json ]; then
+            echo "generated=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "generated=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate spec
+        if: steps.export.outputs.generated == 'true'
+        run: openapi-spec-validator dist/openapi.json
+
+      - name: Attach to GitHub Release
+        if: steps.export.outputs.generated == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ steps.tag.outputs.tag }}" \
+            dist/openapi.json dist/openapi.yaml --clobber

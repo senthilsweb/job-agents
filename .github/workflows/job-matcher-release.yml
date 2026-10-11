@@ -1,0 +1,61 @@
+name: job-matcher release
+
+# Semantic versioning automated from Conventional Commits (feat: → minor,
+# fix: → patch, BREAKING CHANGE → major) via python-semantic-release.
+# On a releasable commit it bumps job-matcher/backend/pyproject.toml +
+# job_matcher/__init__.py, writes the changelog, commits, tags job-matcher-v<X.Y.Z>,
+# and creates the GitHub Release. The job-matcher-v* tag then triggers
+# job-matcher-images.yml, which adds semver tags to the GHCR image.
+# Non-conventional commits produce no release (the run exits cleanly).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "job-matcher/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  # Serialises release commits so two runs cannot race a push to main.
+  group: job-matcher-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    # Skip the bot's own release-stamp commits.
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install python-semantic-release
+        run: pip install "python-semantic-release>=9.8,<10"
+
+      - name: Semantic release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "semantic-release-bot"
+          git config user.email "semantic-release-bot@users.noreply.github.com"
+          # The checkout above is pinned to this run's original trigger SHA.
+          # The shared concurrency group only serializes EXECUTION with
+          # graphify.yml — it does not stop that job's commit (pushed on
+          # top of the same trigger SHA) from landing on main first. Sync
+          # to the current tip before semantic-release computes/commits/
+          # pushes, or its push is rejected non-fast-forward every time
+          # graphify wins the race (observed twice, 2026-07-11).
+          git fetch origin main
+          git reset --hard origin/main
+          cd job-matcher/backend
+          semantic-release version

@@ -1,0 +1,15 @@
+# Child site, merged into the root mkdocs.yml via the monorepo plugin.
+# site_name doubles as the URL namespace: pages publish under /job-matcher/.
+site_name: job-matcher
+docs_dir: docs
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Installation: installation.md
+  - Configuration: configuration.md
+  - Surfaces: surfaces.md
+  - Architecture: architecture.md
+  - ATS rules: ats-rules.md
+  - Runbook: runbook.md
+  - FAQ: faq.md

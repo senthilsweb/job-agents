@@ -1,0 +1,134 @@
+{#- Digest email — candidates only, match-report card style.
+    Spec: openspec/changes/digest-redesign/. Palette and card anatomy
+    ported from job-scout templates/match_report.html.j2 (light mode).
+    Inline CSS only: the safe floor for Gmail/Outlook. -#}
+<!doctype html>
+<html>
+<body style="margin:0; padding:0; background:#f9f9f7; color:#0b0b0b; font-family:-apple-system,Segoe UI,Arial,sans-serif">
+<div style="max-width:720px; margin:0 auto; padding:24px 16px">
+
+  <h2 style="margin:0 0 2px; font-size:20px">job-pilot <span style="color:#898781; font-weight:400">· {{ display_date }}</span></h2>
+  <p style="color:#52514e; font-size:13px; margin:2px 0 18px">
+    {{ n_new }} new posting{{ 's' if n_new != 1 }} scanned since {{ baseline_tag }}
+    {%- if n_outside_us %} · {{ n_outside_us }} outside US{% endif %}
+    · <strong>{{ n_candidates }} matched your filter</strong>
+    · {{ matches|length }} analyzed · {{ pdf_count }} letter{{ 's' if pdf_count != 1 }}
+    · {{ resume_count }} resume{{ 's' if resume_count != 1 }} attached
+  </p>
+
+  {% if not cards %}
+  <div style="background:#fcfcfb; border:1px solid #e1e0d9; border-radius:8px; padding:16px 18px; font-size:14px; color:#52514e">
+    No new jobs matched your filter today ({{ n_new }} posting{{ 's' if n_new != 1 }} scanned).
+    The pipeline ran fine — a silent day would have meant it was broken.
+  </div>
+  {% endif %}
+
+  {% for c in cards %}
+  {% set m = c.m %}
+  {% set band_bg = {'strong_match':'#0ca30c','good_match':'#0a7d5f','moderate_match':'#fab219','weak_match':'#ec835a','no_match':'#d03b3b'}[m.match_band] %}
+  {% set band_fg = '#0b0b0b' if m.match_band in ('moderate_match','weak_match') else '#ffffff' %}
+  <div style="background:#fcfcfb; border:1px solid #e1e0d9; border-radius:8px; margin-bottom:10px; padding:14px 16px">
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse">
+      <tr>
+        <td style="width:56px; vertical-align:top; padding-right:12px">
+          <div style="color:#898781; font-size:12px">{{ loop.index }}</div>
+          <div style="font-size:22px; font-weight:700">{{ m.total_score }}</div>
+        </td>
+        <td style="vertical-align:top">
+          <a href="{{ m.job.apply_url }}" style="color:#0b0b0b; font-size:15px; font-weight:700; text-decoration:none">{{ m.job.title }}</a>
+          <div style="color:#52514e; font-size:12.5px; margin-top:2px">
+            {{ m.job.company_name }} · {{ m.job.location or 'location n/a' }}{% if c.salary %} · {{ c.salary }}{% endif %}
+          </div>
+          {#- four-segment score bar: required / preferred / experience / domain points out of 100 -#}
+          <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:separate; border-spacing:2px 0; margin-top:8px; width:100%; max-width:320px">
+            <tr style="height:9px; font-size:0; line-height:0">
+              {% for pts, color in [(m.required_skills_score,'#2a78d6'), (m.preferred_skills_score,'#1baf7a'), (m.experience_score,'#eda100'), (m.domain_score,'#008300')] %}
+              {%- if pts > 0 %}<td style="width:{{ pts }}%; background:{{ color }}; border-radius:2px">&nbsp;</td>{% endif -%}
+              {% endfor %}
+              {% set rest = 100 - m.total_score %}
+              {%- if rest > 0 %}<td style="width:{{ rest }}%; background:#e1e0d9; border-radius:2px">&nbsp;</td>{% endif %}
+            </tr>
+          </table>
+        </td>
+        <td style="vertical-align:top; text-align:right; white-space:nowrap; padding-left:12px">
+          <span style="background:{{ band_bg }}; color:{{ band_fg }}; font-size:11.5px; font-weight:600; padding:4px 12px; border-radius:999px">{{ m.match_band.replace('_', ' ')|title }}</span><br>
+          <a href="{{ m.job.apply_url }}" style="color:#2a78d6; font-size:13px; text-decoration:none; display:inline-block; margin-top:8px">Apply &#8599;</a>
+        </td>
+      </tr>
+    </table>
+    {% if m.missing_skills %}
+    <div style="color:#52514e; font-size:12.5px; margin-top:10px">
+      <span style="color:#898781; text-transform:uppercase; font-size:10.5px; letter-spacing:.06em">Top gaps</span>
+      — {{ m.missing_skills[:3]|join(' · ') }}
+    </div>
+    {% endif %}
+    {% if c.variant %}
+    <div style="color:#52514e; font-size:12.5px; margin-top:4px">
+      <span style="color:#898781; text-transform:uppercase; font-size:10.5px; letter-spacing:.06em">Resume</span>
+      — {{ c.variant }} variant
+    </div>
+    {% endif %}
+    {% if m.recommendation %}
+    <div style="color:#52514e; font-size:12.5px; margin-top:4px">{{ m.recommendation }}</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  {% if gate %}
+  <div style="background:#fcfcfb; border:1px solid #e1e0d9; border-radius:8px; padding:12px 16px; margin-top:14px">
+    <div style="color:#52514e; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px">
+      Gate &middot; Jev {{ gate.mode }}
+    </div>
+    <div style="font-size:12.5px; color:#52514e">
+      {{ gate.stats.asked }} jobs asked &middot; {{ gate.stats.calls }} calls
+      &middot; {{ gate.stats.errors }} error{{ 's' if gate.stats.errors != 1 }}
+      &middot; {{ gate.stats.rule_candidates }} by rules vs {{ gate.stats.jev_candidates }} by Jev
+      {% if gate.mode == 'shadow' %}&middot; <strong>shadow: nothing changed</strong>{% endif %}
+    </div>
+    {% if gate.reasons %}
+    <div style="font-size:12.5px; color:#52514e; margin-top:6px">
+      <span style="color:#898781; text-transform:uppercase; font-size:10.5px; letter-spacing:.06em">{{ 'Rejected' if gate.mode == 'enforce' else 'Would reject' }}</span>
+      &mdash; {% for k, n in gate.reasons %}{{ k }}: {{ n }}{{ ' &middot; '|safe if not loop.last }}{% endfor %}
+    </div>
+    {% endif %}
+    {% if gate.near_misses %}
+    <div style="font-size:12.5px; color:#52514e; margin-top:8px">
+      <span style="color:#898781; text-transform:uppercase; font-size:10.5px; letter-spacing:.06em">Near-misses ({{ gate.n_near }})</span>
+      {% for r in gate.near_misses %}
+      <div style="margin:2px 0">{{ r.job_ref }} &mdash; {{ r.reason }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% if gate.disagreements %}
+    <div style="font-size:12.5px; color:#52514e; margin-top:8px">
+      <span style="color:#898781; text-transform:uppercase; font-size:10.5px; letter-spacing:.06em">Rules vs Jev ({{ gate.n_disagree }})</span>
+      {% for r in gate.disagreements %}
+      <div style="margin:2px 0">{{ r.job_ref }} &mdash;
+        rules: {{ 'keep' if r.rule_candidate else 'drop' }} / Jev: {{ 'keep' if r.jev_candidate else 'drop' }}
+        {% if r.rule_candidate and r.jev_variant and r.jev_variant != r.rule_variant %}&middot; variant {{ r.rule_variant }} &rarr; {{ r.jev_variant }}{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if failures %}
+  <div style="background:#fcfcfb; border:1px solid #ec835a; border-radius:8px; padding:12px 16px; margin-top:14px">
+    <div style="color:#d03b3b; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px">Failures</div>
+    {% for f in failures %}
+    <div style="font-size:12.5px; color:#52514e; margin:2px 0"><code style="color:#898781">{{ f.node }}</code> — {{ f.job_ref }}: {{ f.reason }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <p style="color:#898781; font-size:11.5px; margin-top:22px">
+    <span style="color:#2a78d6">&#9632;</span> required
+    <span style="color:#1baf7a">&#9632;</span> preferred
+    <span style="color:#eda100">&#9632;</span> experience
+    <span style="color:#008300">&#9632;</span> domain
+    &nbsp;·&nbsp; job-pilot · baseline {{ baseline_tag }}
+  </p>
+</div>
+</body>
+</html>
