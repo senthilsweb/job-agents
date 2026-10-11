@@ -41,6 +41,7 @@ theme:
 nav:
   - Home: index.md
   - Architecture: ARCHITECTURE.md
+  - Deployment: DEPLOYMENT.md
   - job-scout: '!include ./job-scout/mkdocs.yml'
   - job-matcher: '!include ./job-matcher/mkdocs.yml'
   - job-pilot: '!include ./job-pilot/mkdocs.yml'

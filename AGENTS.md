@@ -35,3 +35,9 @@ Three related, independently deployable projects. Read the project's own
 `DIGEST_TO`, `DIGEST_FROM`, `LETTERHEAD_PHONE`, `LANGSMITH_API_KEY`,
 `OTEL_EXPORTER_OTLP_ENDPOINT/HEADERS`, `PHOENIX_COLLECTOR_ENDPOINT`,
 `PHOENIX_CLIENT_HEADERS`, `TYPESAFE_API_KEY`. Variable: `JEV_MODE`.
+
+## Where to read next
+
+- `docs/ARCHITECTURE.md` (system view, the six images, where Jev sits)
+- `docs/DEPLOYMENT.md` (images, secrets, GHCR access, home lab, rollback)
+- `job-pilot/docs/jev.md` (the Jev gate)

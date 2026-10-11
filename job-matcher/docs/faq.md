@@ -85,6 +85,6 @@ taught in [ai-dlc](https://github.com/senthilsweb/ai-dlc).
 
 The shared
 [documentation style guide](https://www.senthilsweb.com/job-agents/style-guide/)
-(canonical copy in the ai-agents repo) — it covers wiki pages, README
+(canonical copy in the job-agents repo) — it covers wiki pages, README
 front doors, `AGENTS.md`, and `SKILL.md` conventions for all
 senthilsweb repos.

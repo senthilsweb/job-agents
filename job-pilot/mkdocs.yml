@@ -6,6 +6,7 @@ docs_dir: docs
 nav:
   - Overview: index.md
   - Getting Started: getting-started.md
+  - Jev gate: jev.md
   - Configuration: configuration.md
   - Runbook: runbook.md
   - CI/CD: ci-cd.md

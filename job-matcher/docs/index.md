@@ -68,7 +68,7 @@ agent service (LLM-2). Nothing else calls a model.
 |---|---|
 | [mcp-chat-client](https://github.com/senthilsweb/mcp-chat-client) | **Runtime dependency.** The embeddable chat widget that drives the agent service's `/chat/stream` and `/upload` endpoints. |
 | [ai-dlc](https://github.com/senthilsweb/ai-dlc) | **Methodology & training deck.** This project is the running example of the AI-DLC spec-first cycle. |
-| [ai-agents](https://github.com/senthilsweb/job-agents) | The monorepo whose `job-scout` pipeline feeds this API job descriptions at scale — and home of the shared docs style guide. |
+| [job-agents](https://github.com/senthilsweb/job-agents) | This repo. Its `job-scout` pipeline feeds the API job descriptions at scale, `job-pilot` is the main caller, and it holds the shared docs style guide. |
 
 ## Pages
 

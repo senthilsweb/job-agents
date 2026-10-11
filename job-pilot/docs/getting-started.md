@@ -18,7 +18,7 @@ SELECT count(*) FROM 'https://raw.githubusercontent.com/senthilsweb/job-agents/m
 ```bash
 cd job-pilot
 python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
-.venv/bin/pytest -q          # 42 tests, no network, no cost
+.venv/bin/pytest -q          # 114 tests, no network, no cost
 ```
 
 ## Path 3 — a real run (needs secrets, small LLM cost)

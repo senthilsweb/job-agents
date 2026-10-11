@@ -22,6 +22,8 @@ public.
 | `matcher.max_jobs_per_run` | above this, the run skips the paid match step (not aborts — see `MAX_JOBS_PER_RUN` below) and reports it in the digest | `25` |
 | `email.subject_template` | subject line with `{date}` `{new}` `{candidates}` `{matched}` `{strong}` `{pdfs}` `{resumes}` placeholders; a typo renders empty, never blocks the send | counts-first template |
 
+| `jev.*` | Jev gate: API URL, model, timeout, retries, breaker, confidence thresholds, near-miss floor, question text | see [Jev gate](jev.md) |
+
 Target roles and the salary floor are **not** duplicated here — edit
 them once in job-scout's `config.yaml` and both agents follow.
 
@@ -63,6 +65,8 @@ phone number ever reaches a committed resume.
 | `RUN_PAID_MATCH` | paid-call switch — `1` allows `/analyze` calls; unset/not `1` hard-aborts the run |
 | `MAX_JOBS_PER_RUN` | optional, one-run override of `matcher.max_jobs_per_run` — e.g. a manual catch-up dispatch (`job-pilot.yml`'s `max_jobs_per_run` input) after a coverage-expansion burst day skipped matching |
 | `LETTERHEAD_PHONE` | phone for the PDF letterhead |
+| `JEV_MODE` | `off` (default), `shadow` or `enforce`; see [Jev gate](jev.md). In CI it is the repository variable of the same name |
+| `TYPESAFE_API_KEY` | TypeSafe Jev key; without it the gate is `off` |
 | `LANGSMITH_TRACING`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT` | LangSmith tracing (optional) |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS` | OpenObserve span export (optional) |
 | `PHOENIX_COLLECTOR_ENDPOINT`, `PHOENIX_CLIENT_HEADERS` | Arize (cloud `otlp.arize.com` or local Phoenix) (optional) |

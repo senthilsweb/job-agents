@@ -1,7 +1,6 @@
 # Documentation Style Guide
 
-The writing standard for every senthilsweb repo (`ai-agents`,
-`agent-job-matcher`, and future projects). It covers wiki pages,
+The writing standard for every senthilsweb repo (`job-agents` and future projects). It covers wiki pages,
 READMEs, `AGENTS.md`, and `SKILL.md` files. Each repo publishes its own
 independent docs site; this page is the one canonical copy of the
 rules — other repos link here instead of copying it.
@@ -110,9 +109,9 @@ containing a `SKILL.md`:
 ## The site pattern
 
 Each repo publishes independently to
-`senthilsweb.github.io/<repo>/`: `docs/` + `mkdocs.yml` (Material
+`www.senthilsweb.com/<repo>/`: `docs/` + `mkdocs.yml` (Material
 theme, explicit `nav`) + a Pages workflow that runs
 `mkdocs build --strict` (broken links fail CI) with mkdocs pinned
 `< 2`. Copy the setup from
-[ai-agents](https://github.com/senthilsweb/job-agents/blob/main/.github/workflows/job-scout-docs.yml)
+[job-agents](https://github.com/senthilsweb/job-agents/blob/main/.github/workflows/site.yml)
 — only `site_name`, `docs_dir`, and `nav` change.

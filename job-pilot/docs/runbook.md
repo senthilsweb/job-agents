@@ -9,6 +9,7 @@ to do when something fails.
 |---|---|---|
 | Daily, after the 11:00 UTC trends publish | `job-pilot daily digest` workflow | one email to `DIGEST_TO` |
 | Every push touching `job-pilot/` | `job-pilot tests and image` workflow | pytest + GHCR image on main |
+| Every 4 hours at :17 | `job-pilot health check` workflow | an alert email only when something is down |
 
 ## The one daily check
 
@@ -31,6 +32,19 @@ look at the latest "job-pilot daily digest" run.
 - **Local paid run**: set `RUN_PAID_MATCH=1` in `.env`, then
   `python run.py --dry-run --baseline trends/YYYYMMDD`. Same guard.
 
+## Health check
+
+Free probes only (never an OpenAI or paid call): job-matcher API and
+agent `/health`, the Phoenix and OTLP trace collectors (an authenticated
+empty POST), TypeSafe Jev reachability, and the trends parquet. Any
+failure sends one formatted email and turns the run red. Dispatch it with
+`force_email=true` to test SMTP and formatting, and `trace_probe=true` to
+send one real span and print the collector's answer.
+
+**A green digest with no matches is not proof of health.** If the home-lab
+API is behind a tunnel that returns 502, jobs fail individually and the
+run can still finish. The health-check email is the signal for that.
+
 ## Failures seen so far
 
 | Symptom | Cause | Fix |
@@ -39,6 +53,7 @@ look at the latest "job-pilot daily digest" run.
 | Digest lists a `match_cap` Failure ("N candidates exceed max_jobs_per_run") | wrong/old baseline, or a genuine coverage-expansion burst, made too many jobs look new in one run; matching was skipped, cost was zero | nothing to fix by default — the baseline advances and normal-sized deltas resume tomorrow; dispatch manually with a raised `max_jobs_per_run` input first if you want that specific batch matched instead of skipped |
 | Arize spans silently missing; exporter logs "Internal Server Error" | Arize requires a `model_id` resource attribute on every span | already fixed in `pipeline/telemetry.py` (2026-07-15) — keep `model_id` if you touch tracing |
 | Digest lists a `resumes` Failure ("expected exactly one sk-resume-…") | `inputs/resumes/` is missing a variant or holds two files for one | rerun `python tools/sync_resumes.py <dir>`; it leaves exactly one file per variant |
+| Digest shows a `jev` Failure | Jev unreachable, key invalid or breaker open; rules decided instead | nothing to fix for that run; check the key and the health-check email. `JEV_MODE=off` removes the gate |
 | `RUN_PAID_MATCH != 1 — refusing paid /analyze calls` (no email, workflow red) | the paid-call switch is off | set `RUN_PAID_MATCH=1` only when you intend to pay |
 
 ## Telemetry

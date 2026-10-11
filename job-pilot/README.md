@@ -37,7 +37,7 @@ fetch_new_jobs → filter_roles → match → render_pdfs → compose_email → 
 cd job-pilot
 python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 cp .env.example .env          # fill in SMTP + matcher endpoints
-.venv/bin/pytest -q           # 34 tests, no network, no secrets
+.venv/bin/pytest -q           # 114 tests, no network, no secrets
 
 # Dry run: real parquet + real filtering, writes runs/<date>/digest.html
 # instead of sending. Paid /analyze calls still need RUN_PAID_MATCH=1.
@@ -79,6 +79,13 @@ and match results belong only in your inbox.
   only from `LETTERHEAD_PHONE` env, never from the committed file.
 - `.env` — all secrets, never in config (see `.env.example`).
 
+## Jev gate
+
+`JEV_MODE=off|shadow|enforce` (default `off`) lets TypeSafe's Jev decide
+location, role fit and resume variant from public job facts only, with
+fallback to the string rules on low confidence or any error. See
+[docs/jev.md](docs/jev.md).
+
 ## Observability and failures
 
 LangGraph traces go to LangSmith (`LANGSMITH_TRACING=true`); OTel spans
@@ -92,8 +99,9 @@ something is broken.
 ## Documentation
 
 The wiki lives at
-[senthilsweb.github.io/ai-job-pilot/](https://senthilsweb.github.io/ai-job-pilot/):
+[www.senthilsweb.com/job-agents/job-pilot/](https://www.senthilsweb.com/job-agents/job-pilot/):
 [Getting Started](docs/getting-started.md) ·
+[Jev gate](docs/jev.md) ·
 [Configuration](docs/configuration.md) · [Runbook](docs/runbook.md) ·
 [CI/CD](docs/ci-cd.md) · [FAQ](docs/faq.md)
 
