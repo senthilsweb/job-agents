@@ -9,12 +9,15 @@ name: job-scout image
 on:
   push:
     branches: [main]
+    # Only what the Dockerfile COPYs (tools, templates, config.yaml, docker/)
+    # starts a build; data, docs, specs and notebooks never do.
     paths:
       - "job-scout/tools/**"
       - "job-scout/templates/**"
       - "job-scout/config.yaml"
       - "job-scout/Dockerfile"
       - "job-scout/docker/**"
+      - "!job-scout/**/*.md"
       - ".github/workflows/job-scout-image.yml"
   workflow_dispatch:
 

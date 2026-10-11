@@ -1,12 +1,24 @@
-# Tests on every push touching job-pilot; image rebuild + GHCR push on
-# main. Tests need no secrets and no network beyond local fixtures
+# Tests when job-pilot code or tests change; the image is rebuilt and pushed
+# only when something the Dockerfile COPYs changed, and only on main. A docs,
+# spec or test-only push runs the tests (or nothing) and never builds an image.
+# Tests need no secrets and no network beyond local fixtures
 # (spec: ci-orchestration "Tests run in CI on every push").
 name: job-pilot tests and image
 
 on:
   push:
+    # Anything that can change behaviour or the image. Docs, specs and
+    # markdown are absent on purpose.
     paths:
-      - "job-pilot/**"
+      - "job-pilot/pipeline/**"
+      - "job-pilot/templates/**"
+      - "job-pilot/inputs/**"
+      - "job-pilot/tests/**"
+      - "job-pilot/tools/**"
+      - "job-pilot/config.yaml"
+      - "job-pilot/run.py"
+      - "job-pilot/pyproject.toml"
+      - "job-pilot/Dockerfile"
       - "job-scout/config.yaml"   # targets/slugs the pipeline reads
       - ".github/workflows/job-pilot-image.yml"
   workflow_dispatch:
@@ -29,9 +41,35 @@ jobs:
           pip install -q -e ".[dev]"
           pytest -q
 
-  image:
-    needs: test
+  changes:
+    # Decides whether the image inputs changed. Tests and tools alone do not
+    # end up in the image, so they do not trigger a build.
     if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.diff.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          # What job-pilot/Dockerfile COPYs, plus the Dockerfile and this workflow.
+          INPUTS='^(job-pilot/(pipeline/|templates/|inputs/|config\.yaml$|run\.py$|pyproject\.toml$|Dockerfile$)|job-scout/config\.yaml$|\.github/workflows/job-pilot-image\.yml$)'
+          BUILD=true
+          if [ "$EVENT" = "push" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            if git diff --name-only "$BEFORE..$SHA" | grep -Eq "$INPUTS"; then BUILD=true; else BUILD=false; fi
+          fi
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+          echo "### job-pilot image: build=$BUILD" >> "$GITHUB_STEP_SUMMARY"
+
+  image:
+    needs: [test, changes]
+    if: needs.changes.outputs.build == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

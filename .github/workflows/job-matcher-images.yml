@@ -24,14 +24,38 @@ on:
   push:
     branches: ["main"]
     tags: ["job-matcher-v*"]
-    # Only job-matcher inputs build these images; spec and doc edits don't.
+    # Only what an image COPYs starts this workflow; docs, specs, tests and
+    # evals never do. detect-changed-images.sh then picks the exact images.
     paths:
-      - "job-matcher/**"
-      - "!job-matcher/openspec/**"
+      - "job-matcher/backend/job_matcher/**"
+      - "job-matcher/backend/pyproject.toml"
+      - "job-matcher/Dockerfile"
+      - "job-matcher/.dockerignore"
+      - "job-matcher/mcp/package.json"
+      - "job-matcher/mcp/package-lock.json"
+      - "job-matcher/mcp/index.js"
+      - "job-matcher/mcp/agent-service/**"
+      - "job-matcher/playground/**"
+      - "job-matcher/openapi-docs/**"
       - "!job-matcher/**/*.md"
+      - "job-matcher/scripts/detect-changed-images.sh"
       - ".github/workflows/job-matcher-images.yml"
   pull_request:
     branches: ["main"]
+    paths:
+      - "job-matcher/backend/job_matcher/**"
+      - "job-matcher/backend/pyproject.toml"
+      - "job-matcher/Dockerfile"
+      - "job-matcher/.dockerignore"
+      - "job-matcher/mcp/package.json"
+      - "job-matcher/mcp/package-lock.json"
+      - "job-matcher/mcp/index.js"
+      - "job-matcher/mcp/agent-service/**"
+      - "job-matcher/playground/**"
+      - "job-matcher/openapi-docs/**"
+      - "!job-matcher/**/*.md"
+      - "job-matcher/scripts/detect-changed-images.sh"
+      - ".github/workflows/job-matcher-images.yml"
   workflow_dispatch:
 
 permissions:
@@ -51,6 +75,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Self-test the change detector
+        run: bash job-matcher/scripts/test-detect-changed-images.sh
 
       - name: Detect images that need building
         id: detect

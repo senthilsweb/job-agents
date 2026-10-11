@@ -33,13 +33,22 @@ set -euo pipefail
 RANGE="${1:-}"
 
 # Table: image ; build context ; dockerfile ; extended regex of files that feed the image.
-# The backend image and the agent service both install ./backend, so backend/ feeds both.
+# Each regex lists what the Dockerfile COPYs at runtime, not whole directories:
+# tests, evals, changelogs and docs never rebuild an image. Keep it in step with
+# the COPY lines (and with the `paths:` filter in job-matcher-images.yml).
+# The backend image and the agent service both install ./backend, so the
+# backend runtime package feeds both.
+BACKEND='backend/(job_matcher/|pyproject\.toml$)'
 COMPONENTS=(
-  "senthilsweb/agent-job-matcher;job-matcher;job-matcher/Dockerfile;^job-matcher/(backend/|Dockerfile$|\.dockerignore$)"
-  "senthilsweb/agent-job-matcher-agent-service;job-matcher;job-matcher/mcp/agent-service/Dockerfile;^job-matcher/(backend/|mcp/|\.dockerignore$)"
+  "senthilsweb/agent-job-matcher;job-matcher;job-matcher/Dockerfile;^job-matcher/(${BACKEND}|Dockerfile$|\.dockerignore$)"
+  "senthilsweb/agent-job-matcher-agent-service;job-matcher;job-matcher/mcp/agent-service/Dockerfile;^job-matcher/(${BACKEND}|\.dockerignore$|mcp/(package\.json|package-lock\.json|index\.js)$|mcp/agent-service/(app\.py|Dockerfile)$)"
   "senthilsweb/agent-job-matcher-playground;job-matcher/playground;job-matcher/playground/Dockerfile;^job-matcher/playground/"
   "senthilsweb/agent-job-matcher-openapi-docs;job-matcher/openapi-docs;job-matcher/openapi-docs/Dockerfile;^job-matcher/openapi-docs/"
 )
+
+# Files that never feed an image, dropped before matching: markdown anywhere
+# under the two web apps, agent instruction files, wiki and specs.
+IGNORE_REGEX='(^|/)(AGENTS|CLAUDE|CHANGELOG)\.md$|^job-matcher/(docs|openspec)/|^job-matcher/(playground|openapi-docs)/.*\.md$'
 
 # Files whose change means "rebuild everything": the build definition itself.
 BUILD_ALL_REGEX='^(\.github/workflows/job-matcher-images\.yml|job-matcher/scripts/detect-changed-images\.sh)$'
@@ -76,7 +85,9 @@ if printf '%s\n' "$CHANGED" | grep -Eq "$BUILD_ALL_REGEX"; then
   exit 0
 fi
 
-# Otherwise select only the components whose inputs changed.
+# Otherwise select only the components whose inputs changed (ignoring files
+# that can never feed an image, such as docs and specs).
+CHANGED="$(printf '%s\n' "$CHANGED" | grep -Ev "$IGNORE_REGEX" || true)"
 SELECTED=()
 for i in "${!COMPONENTS[@]}"; do
   IFS=';' read -r _ _ _ regex <<<"${COMPONENTS[$i]}"

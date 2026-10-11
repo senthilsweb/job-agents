@@ -23,11 +23,42 @@ images by name. **Image names never change**, so a rebuild needs only a pull.
 
 ## How images are built
 
-| Workflow | Triggers | Produces |
+Builds start automatically on push to `main`, and only for the images whose
+inputs changed. "Inputs" means what the Dockerfile `COPY`s, not the whole
+directory, so docs, specs, markdown, tests and the daily parquet never build
+anything.
+
+| Image | Rebuilt when these change | Never rebuilt by |
 |---|---|---|
-| `job-scout-image.yml` | push to main touching `job-scout/tools`, `templates`, `docker`, `Dockerfile` or `config.yaml` | `job-scout` |
-| `job-pilot-image.yml` | push touching `job-pilot/` or `job-scout/config.yaml`: tests on every push, image only on main | `job-pilot` |
-| `job-matcher-images.yml` | push to main touching `job-matcher/**` (not specs or markdown), tags `job-matcher-v*`, PRs build without pushing | the four `agent-job-matcher*` images (only the ones whose paths changed) |
+| `job-scout` | `job-scout/tools`, `templates`, `docker`, `Dockerfile`, `config.yaml` | docs, specs, data, notebooks |
+| `job-pilot` | `job-pilot/pipeline`, `templates`, `inputs` (resumes), `config.yaml`, `run.py`, `pyproject.toml`, `Dockerfile`, and `job-scout/config.yaml` | docs, specs, tests, tools |
+| `agent-job-matcher` | `job-matcher/backend/job_matcher`, `backend/pyproject.toml`, `Dockerfile` | docs, specs, tests, evals, changelog |
+| `agent-job-matcher-agent-service` | the backend files above, `mcp/package*.json`, `mcp/index.js`, `mcp/agent-service/{app.py,Dockerfile}` | docs, specs, `mcp/test`, READMEs |
+| `agent-job-matcher-playground` | `job-matcher/playground/**` | markdown |
+| `agent-job-matcher-openapi-docs` | `job-matcher/openapi-docs/**` | markdown |
+
+Shared inputs fan out correctly: `job-scout/config.yaml` rebuilds both
+`job-scout` and `job-pilot`; the matcher backend rebuilds the API and the
+agent service but not the two web apps.
+
+| Workflow | How it selects |
+|---|---|
+| `job-scout-image.yml` | `paths:` filter |
+| `job-pilot-image.yml` | `paths:` filter starts it; tests run, then a `changes` job diffs the push and builds only if an image input changed (a tests-only push runs tests and stops) |
+| `job-matcher-images.yml` | `paths:` filter starts it; `detect-changed-images.sh` returns the matrix of impacted images |
+
+Always everything: a manual dispatch, a `job-matcher-v*` release tag (so every
+matcher image gets the version tag), and any edit to the build workflow or
+detector itself.
+
+### Changing what an image copies
+
+When a Dockerfile gains or loses a `COPY`, update the matching `paths:` list
+and, for the matcher, the `COMPONENTS` table in
+`job-matcher/scripts/detect-changed-images.sh`. Then run
+`bash job-matcher/scripts/test-detect-changed-images.sh`; CI runs it on every
+matcher build too. A path missing from the table means a stale `latest`, so
+when unsure, add it.
 
 Docker builds run from the repo root because job-pilot's image also copies
 `job-scout/config.yaml`.
