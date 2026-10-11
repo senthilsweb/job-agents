@@ -11,8 +11,12 @@ name: job-matcher release
 on:
   push:
     branches: [main]
+    # Only runtime backend code can cut a release. Docs, specs, the web
+    # apps, other projects and the bot's own changelog/version commits
+    # never start this workflow.
     paths:
-      - "job-matcher/**"
+      - "job-matcher/backend/job_matcher/**"
+      - "job-matcher/backend/pyproject.toml"
   workflow_dispatch:
 
 permissions:
